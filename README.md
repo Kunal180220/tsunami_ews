@@ -2,6 +2,8 @@
 
 An interactive, live-streaming seismic monitoring dashboard and wave propagation simulator. This platform tracks global earthquake data in real-time, instantly flags events capable of triggering tsunamis, and maps potential wave travel pathways across the ocean.
 
+### 🖥️ Live Operations Center Overview
+![Live Operations Room](./images/Live_Operations_Room.png)
 ---
 
 ## 🚀 Key Features
@@ -42,6 +44,18 @@ This equation maps out the arrival time ($T$) for every coordinate on the map. B
 ## 📂 Project Architecture
 
 This application operates **100% in system memory (RAM)**. It maintains no heavy local databases, CSV logs, or image dependencies on your computer, making it completely portable and fast.
+
+#### A. Archive Replay & Historical Anchor Profiles
+![Historical Threat Replication](./images/Historical_Events.png)
+
+#### B. Completely Manual Epicentral Controls
+![Ad-hoc Generative Parameters](./images/Manual_Simulation.png)
+
+#### C. NOAA TTT Pre-Computed Gauge Framework
+![Targeted Coastal Forecast Nodes](./images/NOAA_Framework.png)
+
+#### D. Recent Live Threat Replays
+![Recent Regional Analysis](./images/Recent_Threats.png)
 
 ```text
 tsunami_ews/
