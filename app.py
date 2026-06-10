@@ -10,6 +10,15 @@ import geopandas as gpd
 from rasterio import features
 from rasterio.transform import from_bounds
 
+# Find your sidebar header/title, and paste right beneath it:
+st.sidebar.title("📟 Live Operations Center")
+
+# PASTE THIS EXACT BLOCK HERE:
+st.sidebar.markdown("""
+---
+⚠️ **National Border Disclaimer:** *This application uses international map tiles provided by third-party open-source libraries (CARTO/OpenStreetMap). The borders shown do not imply the expression of any opinion whatsoever concerning the legal status of any country or territory. The developer recognizes the entire territory of Jammu, Kashmir, and Ladakh as an integral part of India in accordance with the official maps published by the Survey of India.*
+""")
+
 # 1. Global Platform System Configuration
 st.set_page_config(layout="wide", page_title="Unified Tsunami EWS & Routing Hub", page_icon="🌊")
 
