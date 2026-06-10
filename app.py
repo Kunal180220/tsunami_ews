@@ -126,8 +126,6 @@ def fetch_dynamic_seismic_matrix():
     IST timestamp shifting, and filters multi-tiered temporal arrays.
     """
     now = datetime.utcnow()
-    
-    # Pre-compiled high-availability 7-day feed directly from USGS servers
     url = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_week.geojson"
     
     try:
@@ -148,14 +146,10 @@ def fetch_dynamic_seismic_matrix():
         lon = geom['coordinates'][0]
         lat = geom['coordinates'][1]
         
-        # --- FIXED IST TIME CONVERSION LOGIC ---
         epoch_time = prop.get('time') / 1000.0
         event_dt_utc = datetime.utcfromtimestamp(epoch_time)
-        
-        # Explicitly apply the Indian Standard Time offset (+5h 30m)
         event_dt_ist = event_dt_utc + timedelta(hours=5, minutes=30)
         
-        # Calculate age threshold metrics against global standard baseline tracking clock
         hours_old = (now - event_dt_utc).total_seconds() / 3600
         readable_time = event_dt_ist.strftime('%m-%d %H:%M') + " IST"
         
@@ -167,15 +161,12 @@ def fetch_dynamic_seismic_matrix():
             "Latitude": lat,
             "Longitude": lon,
             "Time": readable_time,
-            "Time_Raw": event_dt_ist, # Fixed reference here
+            "Time_Raw": event_dt_ist, 
             "Hours_Old": hours_old,
             "Is_Tsunami_Threat": False
         }
         
-        # Tsunami Generation Rules: Severe Shockwave (>=6.5 Magnitude) and Shallow Oceanic Crust (<100km)
         is_seafloor_rupture = mag and mag >= 6.5 and depth < 100
-        
-        # Geofencing coordinate framework for Indian Ocean & Western Pacific Region
         is_in_monitored_zone = (30 <= lon <= 180) and (-50 <= lat <= 60)
 
         if is_seafloor_rupture:
@@ -190,12 +181,8 @@ def fetch_dynamic_seismic_matrix():
         
     return pd.DataFrame(live_stream_24h), pd.DataFrame(active_tsunami_threats), pd.DataFrame(regional_past_3days)
 
-
-# --- EXECUTE INGESTION ENGINE AND PACK MATRIX DATA VARIABLES ---
 df_all, df_tsunami, df_regional_past = fetch_dynamic_seismic_matrix()
 
-
-# --- NETWORK SAFETY VALVE: OFFLINE SIMULATION LOOP ---
 if df_all.empty:
     df_all = pd.DataFrame([
         {"Title": "M 4.5 - Andaman Islands, India Region", "Place": "Andaman Islands, India", "Magnitude": 4.5, "Depth": 35.0, "Latitude": 11.6, "Longitude": 92.7, "Time": "06-10 12:45 IST", "Time_Raw": datetime.utcnow(), "Is_Tsunami_Threat": False},
@@ -226,8 +213,6 @@ tab1, tab2 = st.tabs(["🖥️ LIVE OPERATIONS ROOM", "🗺️ HYDRODYNAMIC ROUT
 # ==============================================
 with tab1:
     col1_map, col1_ticker = st.columns([2, 1])
-    
-    # Initialize a Session State key to store the index of the clicked ticker event
     if "selected_event_index" not in st.session_state:
         st.session_state.selected_event_index = None
 
@@ -238,17 +223,14 @@ with tab1:
         
         if not df_all.empty:
             for idx, row in df_all.iterrows():
-                # Formulate structural button metadata labels
                 button_label = f"M {row['Magnitude']} | {row['Place']} ({row['Time']})"
                 is_selected = (st.session_state.selected_event_index == idx)
                 
                 if row['Is_Tsunami_Threat']:
-                    # Critical threat visual wrapper
                     if st.button(f"🔴 CRITICAL THREAT: {button_label}", key=f"btn_{idx}", use_container_width=True):
                         st.session_state.selected_event_index = idx
                         st.rerun()
                 else:
-                    # Standard event visual wrapper with active selection pointer
                     prefix = "▶️ " if is_selected else "🔸 "
                     if st.button(f"{prefix}{button_label}", key=f"btn_{idx}", use_container_width=True):
                         st.session_state.selected_event_index = idx
@@ -258,37 +240,29 @@ with tab1:
             
     with col1_map:
         st.subheader("📍 Real-Time Global Tactical Grid")
-        
         if not df_all.empty:
             df_mapped = df_all.copy()
             df_mapped['is_active_selection'] = False
             
-            # If a user has clicked a ticker button, inject its state true flag
             if st.session_state.selected_event_index is not None and st.session_state.selected_event_index in df_mapped.index:
                 df_mapped.loc[st.session_state.selected_event_index, 'is_active_selection'] = True
-                
-                # Dynamically extract focused coordinates to anchor the camera viewpoint positioning
                 focus_row = df_mapped.loc[st.session_state.selected_event_index]
                 map_center_lat = focus_row["Latitude"]
                 map_center_lon = focus_row["Longitude"]
-                map_zoom = 5.0  # Bring camera inward for detailed structural examination
+                map_zoom = 5.0  
             else:
-                # Default baseline fallback views if no selection override is active
                 if not df_tsunami.empty:
                     map_center_lat, map_center_lon, map_zoom = df_tsunami.iloc[0]["Latitude"], df_tsunami.iloc[0]["Longitude"], 3.0
                 else:
                     map_center_lat, map_center_lon, map_zoom = 15.0, 80.0, 2.5
                     
-            # Scatterplot configuration tracking the selection flag column
             layer_all_quakes = pdk.Layer(
                 "ScatterplotLayer",
                 df_mapped,
                 get_position="[Longitude, Latitude]",
-                # Scale the point size wider if it's the actively selected element
                 get_radius="is_active_selection ? 18 : (Is_Tsunami_Threat ? 12 : 6)", 
                 radius_min_pixels=4,   
                 radius_max_pixels=35,  
-                # Conditional coloration assignment: Cyan for click highlight, Red/Orange for baseline states
                 get_fill_color="is_active_selection ? [0, 242, 254, 255] : (Is_Tsunami_Threat ? [255, 30, 30, 240] : [255, 160, 20, 160])",
                 get_line_color="is_active_selection ? [255, 255, 255, 255] : [0, 0, 0, 0]",
                 get_line_width=2,
@@ -299,7 +273,6 @@ with tab1:
             )
             
             layers_to_render = [layer_all_quakes]
-            
             if not df_tsunami.empty:
                 st.warning("⚠️ CRITICAL UNDERWATER EVENT RECOGNIZED. RAMPING UP WAVE PROPAGATION MODEL.")
                 active_epi = df_tsunami.iloc[0]
@@ -316,7 +289,6 @@ with tab1:
                 )
                 layers_to_render.append(layer_live_contours)
                 
-                # Retain structural focal array on active tsunami if no button press overrides it
                 if st.session_state.selected_event_index is None:
                     map_center_lat, map_center_lon, map_zoom = active_epi["Latitude"], active_epi["Longitude"], 3.0
                 
@@ -341,16 +313,14 @@ with tab1:
             st.info("Loading baseline tracking matrix...")
 
 # ==============================================================================
-# TAB 2: ROUTING & SIMULATION SANDBOX (WITH NOAA COASTAL LOCATION FORECASTING)
+# TAB 2: ROUTING & SIMULATION SANDBOX
 # ==============================================================================
 with tab2:
     st.subheader("🔮 Custom Manual Simulator & Deep-Sea Pathfinder Sandbox")
     st.markdown("Analyze wave routing pathways by matching past archives, inputting ad-hoc epicenters, or assessing targeted NOAA coastal forecasting zones.")
     
     col2_control, col2_map_view = st.columns([1, 2])
-    
     with col2_control:
-        # Added 4th option for NOAA TTT Coastal Framework matching
         mode = st.radio(
             "Choose Analysis Source Data Node:", 
             [
@@ -364,7 +334,6 @@ with tab2:
         target_lat, target_lon, label_name, sim_mag = 0.0, 0.0, "", 7.5
         origin_dt = datetime.utcnow()
         
-        # --- NOAA TTT PRE-COMPUTED DATABASE STRUCTURING ---
         noaa_regions = {
             "Atlantic & Caribbean": {
                 "San Juan, Puerto Rico": {"lat": 18.46, "lon": -66.11},
@@ -429,9 +398,9 @@ with tab2:
             
         elif mode == "⚠️ Completely Manual Simulator Control":
             st.markdown("#### 🛠️ Simulator Control Inputs")
-            target_lat = st.number_input("Epicenter Latitude (-90.0 to 90.0):", min_value=-90.0, max_value=90.0, value=10.0, step=0.1, key="manual_lat")
-            target_lon = st.number_input("Epicenter Longitude (-180.0 to 180.0):", min_value=-180.0, max_value=180.0, value=90.0, step=0.1, key="manual_lon")
-            sim_mag = st.slider("Select Shockwave Magnitude Scale (M):", min_value=4.0, max_value=9.5, value=7.5, step=0.1, key="manual_mag")
+            target_lat = st.number_input("Epicenter Latitude (-90.0 to 90.0):", min_value=-90.0, max_value=90.0, value=16.59, step=0.1, key="manual_lat")
+            target_lon = st.number_input("Epicenter Longitude (-180.0 to 180.0):", min_value=-180.0, max_value=180.0, value=76.16, step=0.1, key="manual_lon")
+            sim_mag = st.slider("Select Shockwave Magnitude Scale (M):", min_value=4.0, max_value=9.5, value=6.5, step=0.1, key="manual_mag")
             label_name = f"User-Defined Manual Simulation (M {sim_mag})"
             
         elif mode == "🌐 NOAA Framework: Pre-Computed Coastal Gauges":
@@ -441,7 +410,6 @@ with tab2:
             coastal_locations = noaa_regions[chosen_region]
             chosen_gauge = st.selectbox("Select Coastal Location Gauge:", list(coastal_locations.keys()))
             
-            # Anchor coordinate matrix to selected coastal gauge
             target_lat = coastal_locations[chosen_gauge]["lat"]
             target_lon = coastal_locations[chosen_gauge]["lon"]
             sim_mag = st.slider("Simulate Generative Trigger Magnitude (M):", min_value=6.5, max_value=9.5, value=8.0, step=0.1, key="noaa_sim_mag")
@@ -450,19 +418,13 @@ with tab2:
         st.markdown("---")
         st.success(f"**Target Anchored:**\n\n{label_name}\n\nLocation: {target_lat}°, {target_lon}°")
         
-        # Run calculations if event is equal to or greater than critical threshold
         should_calculate_waves = sim_mag >= 6.5
-        
         if should_calculate_waves:
             lons_r, lats_r, travel_grid_r = calculate_propagation(target_lat, target_lon)
             df_replay_contours = get_contour_paths(lons_r, lats_r, travel_grid_r, max_hours=14)
-            
             replay_impact = []
             
-            # 1. Standardize simulation origin baseline to operational IST (+5h 30m)
             origin_dt_ist = origin_dt + timedelta(hours=5, minutes=30)
-            
-            # If tracking via NOAA mode, intercept and calculate arrival vectors for the gauge
             if mode == "🌐 NOAA Framework: Pre-Computed Coastal Gauges":
                 y_idx = (np.abs(lats_r - target_lat)).argmin()
                 x_idx = (np.abs(lons_r - target_lon)).argmin()
@@ -477,7 +439,6 @@ with tab2:
                     "Est. Arrival Time": arrival_time_est.strftime('%H:%M:%S') + " IST"
                 })
             
-            # 2. Supplement baseline port listings with shifted local time rules
             for _, city in cities.iterrows():
                 y_idx = (np.abs(lats_r - city["Lat"])).argmin()
                 x_idx = (np.abs(lons_r - city["Lon"])).argmin()
@@ -493,9 +454,7 @@ with tab2:
                     })
             
             df_rep_impact = pd.DataFrame(replay_impact)
-            
             st.subheader("📊 Intersected Arrival Log")
-            # Render dataframe with updated local timezone headers
             st.dataframe(df_rep_impact, use_container_width=True, hide_index=True)
         else:
             st.info("ℹ️ Tsunami pathfinding suppressed. Magnitude is below critical threshold ($M < 6.5$), indicating minimal hydro-displacement hazard risk.")
@@ -503,15 +462,16 @@ with tab2:
     with col2_map_view:
         st.subheader("🗺️ Replay/Simulation Propagation Trajectory Grid")
         
-        # Dynamic coloring: Magenta circle marker for earthquakes, Neon Cyan star flare for NOAA gauges
-        marker_color = [0, 242, 254, 255] if mode == "🌐 NOAA Framework: Pre-Computed Coastal Gauges" else [255, 0, 255, 250]
+        marker_color = [0, 242, 254, 255] if mode == "🌐 NOAA Framework: Pre-Computed Coastal Gauges" else [255, 0, 255, 200]
         
+        # --- DYNAMIC METER RADIUS LAYERING INTEGRATION ---
         layer_rep_epi = pdk.Layer(
             "ScatterplotLayer",
             pd.DataFrame([{"Lat": target_lat, "Lon": target_lon}]),
             get_position="[Lon, Lat]",
-            get_color=marker_color,
-            get_radius=220000 if mode != "🌐 NOAA Framework: Pre-Computed Coastal Gauges" else 120000,
+            radius_units="'meters'",  # Instructs PyDeck to evaluate radius in real-world metric spacing
+            get_radius=120000 if mode == "🌐 NOAA Framework: Pre-Computed Coastal Gauges" else 250000, # Static real-world ground footprints
+            get_fill_color=marker_color,
             pickable=True
         )
         
@@ -529,7 +489,7 @@ with tab2:
             )
             layers_sandbox.append(layer_rep_contours)
             
-        view_rep = pdk.ViewState(latitude=target_lat, longitude=target_lon, zoom=2.8 if mode == "🌐 NOAA Framework: Pre-Computed Coastal Gauges" else 2.2, pitch=10)
+        view_rep = pdk.ViewState(latitude=target_lat, longitude=target_lon, zoom=4.5 if mode == "🌐 NOAA Framework: Pre-Computed Coastal Gauges" else 3.8, pitch=10)
         
         st.pydeck_chart(pdk.Deck(
             layers=layers_sandbox,
