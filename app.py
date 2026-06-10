@@ -464,22 +464,29 @@ with tab2:
         
         marker_color = [0, 242, 254, 255] if mode == "🌐 NOAA Framework: Pre-Computed Coastal Gauges" else [255, 0, 255, 200]
         
-        # --- DYNAMIC METER RADIUS LAYERING INTEGRATION (FIXED PIXEL CLAMPING) ---
-        layer_rep_epi = pdk.Layer(
-            "ScatterplotLayer",
-            pd.DataFrame([{"Lat": target_lat, "Lon": target_lon}]),
-            get_position="[Lon, Lat]",
-            radius_units="'meters'",  # Use real-world metric spacing
-            get_radius=120000 if mode == "🌐 NOAA Framework: Pre-Computed Coastal Gauges" else 250000, 
-            get_fill_color=marker_color,
-            
-            # 👇 ADD THESE TWO LINES TO UNCLUTTER THE ZOOM CONTROLS:
-            radius_min_pixels=0,  # Allows the dot to shrink to nothing when zooming out
-            radius_max_pixels=99999,  # Allows the dot to grow infinitely when zooming in
-            
-            pickable=True
+        # --- FIXED: NATIVE GEOPANDAS VECTOR BUFFER LAYER ---
+        # 1. Create a clean GeoDataFrame for the epicenter point
+        point_gdf = gpd.GeoDataFrame(
+            geometry=gpd.points_from_xy([target_lon], [target_lat]),
+            crs="EPSG:4326"
         )
         
+        # 2. Convert to a metric coordinate system to draw an accurate kilometer radius circle buffer
+        # (Using a true 150km buffer for NOAA gauges, 250km for manual simulations)
+        buffer_distance = 150000 if mode == "🌐 NOAA Framework: Pre-Computed Coastal Gauges" else 250000
+        
+        # Project to world Mercator meter system (3857), build the circle, and bring it back to global coordinates (4326)
+        buffer_gdf = point_gdf.to_crs(epsg=3857).buffer(buffer_distance).to_crs(epsg=4326)
+        
+        # 3. Render the actual geometry shape directly as a map layer
+        layer_rep_epi = pdk.Layer(
+            "GeoJsonLayer",
+            buffer_gdf.__geo_interface__,  # Feeds the shape directly to deck.gl
+            get_fill_color=marker_color,
+            filled=True,
+            stroked=False,
+            pickable=True
+        )
         layers_sandbox = [layer_rep_epi]
         
         if should_calculate_waves and 'df_replay_contours' in locals() and not df_replay_contours.empty:
