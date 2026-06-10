@@ -464,14 +464,19 @@ with tab2:
         
         marker_color = [0, 242, 254, 255] if mode == "🌐 NOAA Framework: Pre-Computed Coastal Gauges" else [255, 0, 255, 200]
         
-        # --- DYNAMIC METER RADIUS LAYERING INTEGRATION ---
+        # --- DYNAMIC METER RADIUS LAYERING INTEGRATION (FIXED PIXEL CLAMPING) ---
         layer_rep_epi = pdk.Layer(
             "ScatterplotLayer",
             pd.DataFrame([{"Lat": target_lat, "Lon": target_lon}]),
             get_position="[Lon, Lat]",
-            radius_units="'meters'",  # Instructs PyDeck to evaluate radius in real-world metric spacing
-            get_radius=120000 if mode == "🌐 NOAA Framework: Pre-Computed Coastal Gauges" else 250000, # Static real-world ground footprints
+            radius_units="'meters'",  # Use real-world metric spacing
+            get_radius=120000 if mode == "🌐 NOAA Framework: Pre-Computed Coastal Gauges" else 250000, 
             get_fill_color=marker_color,
+            
+            # 👇 ADD THESE TWO LINES TO UNCLUTTER THE ZOOM CONTROLS:
+            radius_min_pixels=0,  # Allows the dot to shrink to nothing when zooming out
+            radius_max_pixels=99999,  # Allows the dot to grow infinitely when zooming in
+            
             pickable=True
         )
         
