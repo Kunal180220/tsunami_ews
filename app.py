@@ -285,7 +285,7 @@ with tab1:
                         st.rerun()
             st.markdown("<br/>", unsafe_allow_html=True)
 
-    # Main column split ratio arrangement configuration
+    # Main column split arrangement configuration
     col1_map, col1_ticker = st.columns([2, 1])
 
     with col1_ticker:
@@ -317,9 +317,16 @@ with tab1:
             df_mapped['is_active_selection'] = False
             df_mapped['is_latest'] = df_mapped['Hours_Old'] <= 2.0
             
+            # Create a separate tracking dataframe specifically for the persistent lock focus
+            df_locked_layer = pd.DataFrame()
+            
             if st.session_state.selected_event_index is not None and st.session_state.selected_event_index in df_mapped.index:
                 df_mapped.loc[st.session_state.selected_event_index, 'is_active_selection'] = True
                 focus_row = df_mapped.loc[st.session_state.selected_event_index]
+                
+                # Pop out the selected row into our standalone hover persistence layer
+                df_locked_layer = pd.DataFrame([focus_row.to_dict()])
+                
                 map_center_lat = focus_row["Latitude"]
                 map_center_lon = focus_row["Longitude"]
                 map_zoom = 5.0  
@@ -329,6 +336,7 @@ with tab1:
                 else:
                     map_center_lat, map_center_lon, map_zoom = 15.0, 80.0, 2.5
                     
+            # 1. Base Interactive Data Point Layer (Triggers dynamic tooltips instantly on cursor hover)
             layer_all_quakes = pdk.Layer(
                 "ScatterplotLayer",
                 df_mapped,
@@ -343,6 +351,19 @@ with tab1:
                 pickable=True,
                 auto_highlight=True,
                 highlight_color=[0, 242, 254, 255]
+            )
+            
+            # NEW: 2. Invisible Hover Retention Overlay Layer
+            # When active, it forces WebGL to constantly display its tracking context properties 
+            layer_persistent_lock_overlay = pdk.Layer(
+                "ScatterplotLayer",
+                df_locked_layer,
+                get_position="[Longitude, Latitude]",
+                get_radius=200000,
+                radius_min_pixels=25,
+                radius_max_pixels=60,
+                get_fill_color=[0, 242, 254, 30],
+                pickable=True
             )
             
             # Layer A1.3: Animated Outer Heartbeat Radar Ring
@@ -411,6 +432,10 @@ with tab1:
             layers_to_render.append(layer_latest_radar_core)
             layers_to_render.append(layer_all_quakes)
             
+            # Mount the persistent lock overlay right on top of the focus stack
+            if not df_locked_layer.empty:
+                layers_to_render.append(layer_persistent_lock_overlay)
+            
             if not df_tsunami.empty:
                 st.warning("⚠️ CRITICAL UNDERWATER EVENT RECOGNIZED. RAMPING UP WAVE PROPAGATION MODEL.")
                 active_epi = df_tsunami.iloc[0]
@@ -433,7 +458,21 @@ with tab1:
             st.pydeck_chart(pdk.Deck(
                 layers=layers_to_render,
                 initial_view_state=pdk.ViewState(latitude=map_center_lat, longitude=map_center_lon, zoom=map_zoom, pitch=10),
-                map_style="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+                map_style="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+                tooltip={
+                    "html": """
+                        <div style='font-family: monospace; background-color: #121824; color: #00f2fe; padding: 8px; border-radius: 4px; border: 1px solid #00f2fe; max-width: 300px;'>
+                            <b>📊 Magnitude:</b> {Magnitude}<br/>
+                            <b>📍 Location:</b> {Place}<br/>
+                            <b>🌐 Coordinates:</b> {Latitude}°, {Longitude}°<br/>
+                            <b>📉 Depth:</b> {Depth} km<br/>
+                            <b>🛡️ Proximity Fault:</b> {Fault}<br/>
+                            <b>💥 Trigger Reason:</b> {Reason}<br/>
+                            <b>🕒 Time:</b> {Time}
+                        </div>
+                    """,
+                    "style": {"backgroundColor": "transparent", "zIndex": "10000"}
+                }
             ), height=650)
         else:
             st.info("Loading baseline tracking matrix...")
@@ -653,7 +692,7 @@ with tab2:
             )
             layers_sandbox.append(layer_rep_contours)
             
-        view_rep = pdk.ViewState(latitude=target_lat, longitude=target_lon, zoom=4.5 if mode == "🌐 NOAA Framework: Pre-Computed Coastal Gauges" else 3.8, pitch=10)
+            view_rep = pdk.ViewState(latitude=target_lat, longitude=target_lon, zoom=4.5 if mode == "🌐 NOAA Framework: Pre-Computed Coastal Gauges" else 3.8, pitch=10)
         
         st.pydeck_chart(pdk.Deck(
             layers=layers_sandbox,
