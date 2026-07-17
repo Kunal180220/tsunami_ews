@@ -319,19 +319,35 @@ with tab1:
                 highlight_color=[0, 242, 254, 255]
             )
             
-            # Layer A1.5: Neon Radar Tracking Halo Switch Engine
-            layer_latest_radar_glow = pdk.Layer(
+            # Layer A1.3: Broad Ambient Ring (Shockwave background glow)
+            layer_latest_radar_ambient = pdk.Layer(
                 "ScatterplotLayer",
                 df_mapped[df_mapped['is_latest'] == True],
                 get_position="[Longitude, Latitude]",
-                get_radius=250000,
-                radius_min_pixels=15,
-                radius_max_pixels=70,
-                get_fill_color=[255, 255, 255, 35],
-                get_line_color=[0, 242, 254, 220],
-                get_line_width=3,
+                get_radius=350000,
+                radius_min_pixels=25,
+                radius_max_pixels=80,
+                get_fill_color=[0, 242, 254, 20],
+                get_line_color=[0, 242, 254, 80],
+                get_line_width=1.5,
                 stroked=True,
                 filled=True,
+                pickable=False
+            )
+
+            # Layer A1.6: Sharp Core Warning Ring (Immediate high-contrast targeting line)
+            layer_latest_radar_core = pdk.Layer(
+                "ScatterplotLayer",
+                df_mapped[df_mapped['is_latest'] == True],
+                get_position="[Longitude, Latitude]",
+                get_radius=150000,
+                radius_min_pixels=12,
+                radius_max_pixels=40,
+                get_fill_color=[255, 255, 255, 0],
+                get_line_color=[255, 255, 255, 240],
+                get_line_width=3.5,
+                stroked=True,
+                filled=False,
                 pickable=False
             )
             
@@ -366,7 +382,8 @@ with tab1:
             if show_faults:
                 layers_to_render.append(layer_fault_lines)
                 
-            layers_to_render.append(layer_latest_radar_glow)
+            layers_to_render.append(layer_latest_radar_ambient)
+            layers_to_render.append(layer_latest_radar_core)
             layers_to_render.append(layer_all_quakes)
             
             if not df_tsunami.empty:
