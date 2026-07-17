@@ -16,6 +16,9 @@ st.set_page_config(layout="wide", page_title="Unified Tsunami EWS & Routing Hub"
 # Find your sidebar header/title, and paste right beneath it:
 st.sidebar.title("📟 Live Operations Center")
 
+# Dynamic operational layer switch visibility flag
+show_faults = st.sidebar.checkbox("👁️ Display Tectonic Plate Fault Lines", value=True)
+
 st.sidebar.markdown("""
 ---
 ⚠️ **National Border Disclaimer:** *This application uses international map tiles provided by third-party open-source libraries (CARTO/OpenStreetMap). The borders shown do not imply the expression of any opinion whatsoever concerning the legal status of any country or territory. The developer recognizes the entire territory of Jammu, Kashmir, and Ladakh as an integral part of India in accordance with the official maps published by the Survey of India.*
@@ -251,6 +254,7 @@ tab1, tab2 = st.tabs(["🖥️ LIVE OPERATIONS ROOM", "🗺️ HYDRODYNAMIC ROUT
 # TAB 1: LIVE OPERATIONS ROOM
 # ==============================================
 with tab1:
+    # UPDATED COLUMN RATIO: Gives 2/3 of the space to the map layout grid
     col1_map, col1_ticker = st.columns([2, 1])
     if "selected_event_index" not in st.session_state:
         st.session_state.selected_event_index = None
@@ -322,7 +326,11 @@ with tab1:
                 pickable=False
             )
             
-            layers_to_render = [layer_fault_lines, layer_all_quakes]
+            layers_to_render = [layer_all_quakes]
+            
+            # Conditionally load structural faults if the sidebar checkbox layer visibility flag is enabled
+            if show_faults:
+                layers_to_render.insert(0, layer_fault_lines)
             
             if not df_tsunami.empty:
                 st.warning("⚠️ CRITICAL UNDERWATER EVENT RECOGNIZED. RAMPING UP WAVE PROPAGATION MODEL.")
@@ -361,7 +369,7 @@ with tab1:
                     """,
                     "style": {"backgroundColor": "transparent", "zIndex": "10000"}
                 }
-            ))
+            ), height=650) # Taller vertical orientation map canvas dimensions
         else:
             st.info("Loading baseline tracking matrix...")
 
@@ -569,7 +577,11 @@ with tab2:
             pickable=False
         )
         
-        layers_sandbox = [layer_sandbox_faults, layer_rep_epi_buffer, layer_rep_epi_core]
+        layers_sandbox = [layer_rep_epi_buffer, layer_rep_epi_core]
+        
+        # Append sandbox fault visualization vectors if checkbox toggled active
+        if show_faults:
+            layers_sandbox.insert(0, layer_sandbox_faults)
         
         if should_calculate_waves and 'df_replay_contours' in locals() and not df_replay_contours.empty:
             layer_rep_contours = pdk.Layer(
@@ -601,4 +613,4 @@ with tab2:
                 """,
                 "style": {"backgroundColor": "transparent", "zIndex": "10000"}
             }
-        ))
+        ), height=650)
