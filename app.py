@@ -16,8 +16,9 @@ st.set_page_config(layout="wide", page_title="Unified Tsunami EWS & Routing Hub"
 # Find your sidebar header/title, and paste right beneath it:
 st.sidebar.title("📟 Live Operations Center")
 
-# Dynamic operational layer switch visibility flag
+# Dynamic operational layer switch visibility flags
 show_faults = st.sidebar.checkbox("👁️ Display Tectonic Plate Fault Lines", value=True)
+show_heatmap = st.sidebar.checkbox("👁️ Display Seismic Activity Heatmap", value=True)
 
 st.sidebar.markdown("""
 ---
@@ -254,7 +255,7 @@ tab1, tab2 = st.tabs(["🖥️ LIVE OPERATIONS ROOM", "🗺️ HYDRODYNAMIC ROUT
 # TAB 1: LIVE OPERATIONS ROOM
 # ==============================================
 with tab1:
-    # UPDATED COLUMN RATIO: Gives 2/3 of the space to the map layout grid
+    # OPTIMIZED RATIO: Map takes 2/3 space, List takes 1/3 space
     col1_map, col1_ticker = st.columns([2, 1])
     if "selected_event_index" not in st.session_state:
         st.session_state.selected_event_index = None
@@ -315,7 +316,7 @@ with tab1:
                 highlight_color=[0, 242, 254, 255]
             )
             
-            # Layer A1: Fault Lines Vectorization Network
+            # Layer A2: Fault Lines Vectorization Network
             layer_fault_lines = pdk.Layer(
                 "PathLayer",
                 df_faults,
@@ -326,11 +327,27 @@ with tab1:
                 pickable=False
             )
             
-            layers_to_render = [layer_all_quakes]
+            # Layer A3: Heatmap Intensity Engine
+            layer_seismic_heatmap = pdk.Layer(
+                "HeatmapLayer",
+                df_mapped,
+                get_position="[Longitude, Latitude]",
+                get_weight="Magnitude",
+                radius_pixels=65,
+                intensity=1.8,
+                threshold=0.03,
+                opacity=0.7
+            )
             
-            # Conditionally load structural faults if the sidebar checkbox layer visibility flag is enabled
+            layers_to_render = []
+            
+            # Stack layout sequentially based on checkbox switch matrix selections
+            if show_heatmap:
+                layers_to_render.append(layer_seismic_heatmap)
             if show_faults:
-                layers_to_render.insert(0, layer_fault_lines)
+                layers_to_render.append(layer_fault_lines)
+                
+            layers_to_render.append(layer_all_quakes)
             
             if not df_tsunami.empty:
                 st.warning("⚠️ CRITICAL UNDERWATER EVENT RECOGNIZED. RAMPING UP WAVE PROPAGATION MODEL.")
@@ -369,7 +386,7 @@ with tab1:
                     """,
                     "style": {"backgroundColor": "transparent", "zIndex": "10000"}
                 }
-            ), height=650) # Taller vertical orientation map canvas dimensions
+            ), height=650) # Expanded 650px vertical screen space footprint height allocation
         else:
             st.info("Loading baseline tracking matrix...")
 
