@@ -3,7 +3,7 @@ pandas
 pydeck
 requests
 numpy
-skfmm
+scikit-fmm
 matplotlib
 geopandas
 rasterio
