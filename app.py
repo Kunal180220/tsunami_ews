@@ -6,6 +6,7 @@ import numpy as np
 import skfmm
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
+import gpd
 import geopandas as gpd
 from rasterio import features
 from rasterio.transform import from_bounds
@@ -288,6 +289,9 @@ with tab1:
             df_mapped = df_all.copy()
             df_mapped['is_active_selection'] = False
             
+            # Isolate fresh items occurring within the last 2 hours
+            df_mapped['is_latest'] = df_mapped['Hours_Old'] <= 2.0
+            
             if st.session_state.selected_event_index is not None and st.session_state.selected_event_index in df_mapped.index:
                 df_mapped.loc[st.session_state.selected_event_index, 'is_active_selection'] = True
                 focus_row = df_mapped.loc[st.session_state.selected_event_index]
@@ -314,6 +318,22 @@ with tab1:
                 pickable=True,
                 auto_highlight=True,
                 highlight_color=[0, 242, 254, 255]
+            )
+            
+            # Layer A1.5: Neon Radar Tracking Halo Switch Engine
+            layer_latest_radar_glow = pdk.Layer(
+                "ScatterplotLayer",
+                df_mapped[df_mapped['is_latest'] == True],
+                get_position="[Longitude, Latitude]",
+                get_radius=250000,
+                radius_min_pixels=15,
+                radius_max_pixels=70,
+                get_fill_color=[255, 255, 255, 35],
+                get_line_color=[0, 242, 254, 220],
+                get_line_width=3,
+                stroked=True,
+                filled=True,
+                pickable=False
             )
             
             # Layer A2: Fault Lines Vectorization Network
@@ -347,6 +367,7 @@ with tab1:
             if show_faults:
                 layers_to_render.append(layer_fault_lines)
                 
+            layers_to_render.append(layer_latest_radar_glow)
             layers_to_render.append(layer_all_quakes)
             
             if not df_tsunami.empty:
