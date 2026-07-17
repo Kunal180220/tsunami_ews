@@ -40,9 +40,7 @@ st.markdown("---")
 # ==============================================================================
 # ANIMATION CALCULATOR: Generate Heartbeat Waveform Scalars
 # ==============================================================================
-# Uses time-based trigonometry to create a smooth, continuous contraction/expansion pulse
 current_timestamp = time.time()
-# heartbeat formula produces an oscillation between ~0.7 and ~1.3
 heartbeat_pulse = 1.0 + 0.3 * np.sin(current_timestamp * 2 * np.pi * 1.2) 
 
 # ==============================================================================
@@ -87,7 +85,7 @@ def find_nearest_fault_info(lat, lon):
     return nearest_fault_name, nearest_fault_reason
 
 # 2. Optimized High-Performance Wave Propagation Engine
-@st.cache_data(ttl=3600)  # Cache the baseline land mask to keep performance lightning fast
+@st.cache_data(ttl=3600)
 def get_cached_land_mask(height, width):
     transform = from_bounds(-180, -90, 180, 90, width, height)
     try:
@@ -120,10 +118,9 @@ def calculate_propagation(epicenter_lat, epicenter_lon):
     else:
         bathymetry[bathymetry > -150] = 500
 
-    # Physics Core: Shallow Water Wave Speed v = sqrt(g * h)
     g = 9.81
     depth_profile = np.abs(bathymetry)
-    depth_profile[bathymetry > 0] = 0.001  # Prevent division by zero on land
+    depth_profile[bathymetry > 0] = 0.001
     
     speed_ms = np.sqrt(g * depth_profile)
     speed_deg_per_hr = (speed_ms * 3600) / 111000
@@ -132,7 +129,7 @@ def calculate_propagation(epicenter_lat, epicenter_lon):
     epi_x = (np.abs(lons - epicenter_lon)).argmin()
     
     speed_field = np.array(speed_deg_per_hr)
-    speed_field[bathymetry > 0] = 0.0001  # Land masses block waves naturally
+    speed_field[bathymetry > 0] = 0.0001
     
     phi = np.ones_like(speed_field)
     phi[epi_y, epi_x] = -1
@@ -144,7 +141,6 @@ def calculate_propagation(epicenter_lat, epicenter_lon):
         
     return lons, lats, travel_times_hr
 
-# Extract map line contours out of the math engine matrix array
 def get_contour_paths(lons, lats, travel_grid, max_hours=12):
     contours_data = []
     levels = np.arange(1, max_hours + 1, 1)
@@ -171,7 +167,6 @@ def get_contour_paths(lons, lats, travel_grid, max_hours=12):
 # ==============================================================================
 @st.cache_data(ttl=30)
 def fetch_dynamic_seismic_matrix():
-    """Connects to the global USGS streaming seismic network, handles dynamic IST timestamp shifting, and filters multi-tiered temporal arrays."""
     now = datetime.utcnow()
     url = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_week.geojson"
     
@@ -200,7 +195,6 @@ def fetch_dynamic_seismic_matrix():
         hours_old = (now - event_dt_utc).total_seconds() / 3600
         readable_time = event_dt_ist.strftime('%m-%d %H:%M') + " IST"
         
-        # Inject tectonic reasons dynamically for the event based on closest fault node
         fault_name, fault_reason = find_nearest_fault_info(lat, lon)
         
         event_dict = {
@@ -264,9 +258,35 @@ tab1, tab2 = st.tabs(["🖥️ LIVE OPERATIONS ROOM", "🗺️ HYDRODYNAMIC ROUT
 # TAB 1: LIVE OPERATIONS ROOM
 # ==============================================
 with tab1:
-    col1_map, col1_ticker = st.columns([2, 1])
     if "selected_event_index" not in st.session_state:
         st.session_state.selected_event_index = None
+
+    # ==============================================================================
+    # PERSISTENT TELEMETRY LOCK CARD (Stays open until explicitly dismissed)
+    # ==============================================================================
+    if st.session_state.selected_event_index is not None and not df_all.empty:
+        if st.session_state.selected_event_index in df_all.index:
+            event = df_all.loc[st.session_state.selected_event_index]
+            
+            with st.container(border=True):
+                c1, c2, c3 = st.columns([3, 3, 1])
+                with c1:
+                    st.markdown(f"### 🛡️ Telemetry Lock: {event['Place']}")
+                    st.markdown(f"**🕒 Event Timeline:** {event['Time']}")
+                    st.markdown(f"**🌐 Coordinates:** `{event['Latitude']}°, {event['Longitude']}°`")
+                with c2:
+                    st.markdown(f"**📊 Magnitude Scale:** `M {event['Magnitude']}`")
+                    st.markdown(f"**📉 Crustal Depth:** {event['Depth']} km")
+                    st.markdown(f"**🌋 Associated Fault Break:** *{event['Fault']}*")
+                    st.caption(f"ℹ️ {event['Reason']}")
+                with c3:
+                    if st.button("❌ Close Panel", key="close_panel_btn", width="stretch"):
+                        st.session_state.selected_event_index = None
+                        st.rerun()
+            st.markdown("<br/>", unsafe_allow_html=True)
+
+    # Main column split ratio arrangement configuration
+    col1_map, col1_ticker = st.columns([2, 1])
 
     with col1_ticker:
         st.subheader("🚨 Real-Time Seismic Stream")
@@ -279,12 +299,12 @@ with tab1:
                 is_selected = (st.session_state.selected_event_index == idx)
                 
                 if row['Is_Tsunami_Threat']:
-                    if st.button(f"🔴 CRITICAL THREAT: {button_label}", key=f"btn_{idx}", use_container_width=True):
+                    if st.button(f"🔴 CRITICAL THREAT: {button_label}", key=f"btn_{idx}", width="stretch"):
                         st.session_state.selected_event_index = idx
                         st.rerun()
                 else:
                     prefix = "▶️ " if is_selected else "🔸 "
-                    if st.button(f"{prefix}{button_label}", key=f"btn_{idx}", use_container_width=True):
+                    if st.button(f"{prefix}{button_label}", key=f"btn_{idx}", width="stretch"):
                         st.session_state.selected_event_index = idx
                         st.rerun()
         else:
@@ -295,8 +315,6 @@ with tab1:
         if not df_all.empty:
             df_mapped = df_all.copy()
             df_mapped['is_active_selection'] = False
-            
-            # Isolate fresh items occurring within the last 2 hours
             df_mapped['is_latest'] = df_mapped['Hours_Old'] <= 2.0
             
             if st.session_state.selected_event_index is not None and st.session_state.selected_event_index in df_mapped.index:
@@ -328,15 +346,14 @@ with tab1:
             )
             
             # Layer A1.3: Animated Outer Heartbeat Radar Ring
-            # Evaluates the heartbeat expression variables to stretch metrics dynamically
             layer_latest_radar_ambient = pdk.Layer(
                 "ScatterplotLayer",
                 df_mapped[df_mapped['is_latest'] == True],
                 get_position="[Longitude, Latitude]",
-                get_radius=int(380000 * heartbeat_pulse),   # Pulsates the scale size factor
+                get_radius=int(380000 * heartbeat_pulse),   
                 radius_min_pixels=int(20 * heartbeat_pulse),
                 radius_max_pixels=int(85 * heartbeat_pulse),
-                get_fill_color=[0, 242, 254, int(25 / heartbeat_pulse)], # Fades out transparency as it expands
+                get_fill_color=[0, 242, 254, int(25 / heartbeat_pulse)], 
                 get_line_color=[0, 242, 254, 100],
                 get_line_width=1.5,
                 stroked=True,
@@ -349,7 +366,7 @@ with tab1:
                 "ScatterplotLayer",
                 df_mapped[df_mapped['is_latest'] == True],
                 get_position="[Longitude, Latitude]",
-                get_radius=int(160000 * (2.0 - heartbeat_pulse)), # Inverts vector contraction direction
+                get_radius=int(160000 * (2.0 - heartbeat_pulse)), 
                 radius_min_pixels=10,
                 radius_max_pixels=45,
                 get_fill_color=[255, 255, 255, 0],
@@ -416,21 +433,7 @@ with tab1:
             st.pydeck_chart(pdk.Deck(
                 layers=layers_to_render,
                 initial_view_state=pdk.ViewState(latitude=map_center_lat, longitude=map_center_lon, zoom=map_zoom, pitch=10),
-                map_style="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
-                tooltip={
-                    "html": """
-                        <div style='font-family: monospace; background-color: #121824; color: #00f2fe; padding: 8px; border-radius: 4px; border: 1px solid #00f2fe; max-width: 300px;'>
-                            <b>📊 Magnitude:</b> {Magnitude}<br/>
-                            <b>📍 Location:</b> {Place}<br/>
-                            <b>🌐 Coordinates:</b> {Latitude}°, {Longitude}°<br/>
-                            <b>📉 Depth:</b> {Depth} km<br/>
-                            <b>🛡️ Proximity Fault:</b> {Fault}<br/>
-                            <b>💥 Trigger Reason:</b> {Reason}<br/>
-                            <b>🕒 Time:</b> {Time}
-                        </div>
-                    """,
-                    "style": {"backgroundColor": "transparent", "zIndex": "10000"}
-                }
+                map_style="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
             ), height=650)
         else:
             st.info("Loading baseline tracking matrix...")
@@ -580,7 +583,7 @@ with tab2:
             
             df_rep_impact = pd.DataFrame(replay_impact)
             st.subheader("📊 Intersected Arrival Log")
-            st.dataframe(df_rep_impact, use_container_width=True, hide_index=True)
+            st.dataframe(df_rep_impact, width="stretch", hide_index=True)
         else:
             st.info("ℹ️ Tsunami pathfinding suppressed. Magnitude is below critical threshold ($M < 6.5$), indicating minimal hydro-displacement hazard risk.")
             
@@ -673,6 +676,5 @@ with tab2:
 # ==============================================================================
 # 6. HIGH-FREQUENCY RADAR PULSE LOOP CONTROL
 # ==============================================================================
-# Forces Streamlit to instantly re-render every 150ms to drive the heartbeat fluidly
 time.sleep(0.15)
 st.rerun()
