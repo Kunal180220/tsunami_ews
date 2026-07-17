@@ -6,7 +6,6 @@ import numpy as np
 import skfmm
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
-import gpd
 import geopandas as gpd
 from rasterio import features
 from rasterio.transform import from_bounds
