@@ -251,7 +251,7 @@ tab1, tab2 = st.tabs(["🖥️ LIVE OPERATIONS ROOM", "🗺️ HYDRODYNAMIC ROUT
 # TAB 1: LIVE OPERATIONS ROOM
 # ==============================================
 with tab1:
-    col1_map, col1_ticker = st.columns([1, 2])
+    col1_map, col1_ticker = st.columns([2, 1])
     if "selected_event_index" not in st.session_state:
         st.session_state.selected_event_index = None
 
