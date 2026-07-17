@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import geopandas as gpd
 from rasterio import features
 from rasterio.transform import from_bounds
+import time
 
 # 1. Global Platform System Configuration
 st.set_page_config(layout="wide", page_title="Unified Tsunami EWS & Routing Hub", page_icon="🌊")
@@ -35,6 +36,14 @@ st.markdown("""
 
 st.title("🎛️ Unified Tsunami Early Warning & Routing Platform")
 st.markdown("---")
+
+# ==============================================================================
+# ANIMATION CALCULATOR: Generate Heartbeat Waveform Scalars
+# ==============================================================================
+# Uses time-based trigonometry to create a smooth, continuous contraction/expansion pulse
+current_timestamp = time.time()
+# heartbeat formula produces an oscillation between ~0.7 and ~1.3
+heartbeat_pulse = 1.0 + 0.3 * np.sin(current_timestamp * 2 * np.pi * 1.2) 
 
 # ==============================================================================
 # DATA CORE: Define the 3 prominent regional plate boundary/fault zone paths
@@ -255,7 +264,6 @@ tab1, tab2 = st.tabs(["🖥️ LIVE OPERATIONS ROOM", "🗺️ HYDRODYNAMIC ROUT
 # TAB 1: LIVE OPERATIONS ROOM
 # ==============================================
 with tab1:
-    # OPTIMIZED RATIO: Map takes 2/3 space, List takes 1/3 space
     col1_map, col1_ticker = st.columns([2, 1])
     if "selected_event_index" not in st.session_state:
         st.session_state.selected_event_index = None
@@ -319,32 +327,33 @@ with tab1:
                 highlight_color=[0, 242, 254, 255]
             )
             
-            # Layer A1.3: Broad Ambient Ring (Shockwave background glow)
+            # Layer A1.3: Animated Outer Heartbeat Radar Ring
+            # Evaluates the heartbeat expression variables to stretch metrics dynamically
             layer_latest_radar_ambient = pdk.Layer(
                 "ScatterplotLayer",
                 df_mapped[df_mapped['is_latest'] == True],
                 get_position="[Longitude, Latitude]",
-                get_radius=350000,
-                radius_min_pixels=25,
-                radius_max_pixels=80,
-                get_fill_color=[0, 242, 254, 20],
-                get_line_color=[0, 242, 254, 80],
+                get_radius=int(380000 * heartbeat_pulse),   # Pulsates the scale size factor
+                radius_min_pixels=int(20 * heartbeat_pulse),
+                radius_max_pixels=int(85 * heartbeat_pulse),
+                get_fill_color=[0, 242, 254, int(25 / heartbeat_pulse)], # Fades out transparency as it expands
+                get_line_color=[0, 242, 254, 100],
                 get_line_width=1.5,
                 stroked=True,
                 filled=True,
                 pickable=False
             )
 
-            # Layer A1.6: Sharp Core Warning Ring (Immediate high-contrast targeting line)
+            # Layer A1.6: Tight Inner Counter-Pulse Accent
             layer_latest_radar_core = pdk.Layer(
                 "ScatterplotLayer",
                 df_mapped[df_mapped['is_latest'] == True],
                 get_position="[Longitude, Latitude]",
-                get_radius=150000,
-                radius_min_pixels=12,
-                radius_max_pixels=40,
+                get_radius=int(160000 * (2.0 - heartbeat_pulse)), # Inverts vector contraction direction
+                radius_min_pixels=10,
+                radius_max_pixels=45,
                 get_fill_color=[255, 255, 255, 0],
-                get_line_color=[255, 255, 255, 240],
+                get_line_color=[255, 255, 255, int(200 * (heartbeat_pulse - 0.5))],
                 get_line_width=3.5,
                 stroked=True,
                 filled=False,
@@ -376,7 +385,6 @@ with tab1:
             
             layers_to_render = []
             
-            # Stack layout sequentially based on checkbox switch matrix selections
             if show_heatmap:
                 layers_to_render.append(layer_seismic_heatmap)
             if show_faults:
@@ -423,7 +431,7 @@ with tab1:
                     """,
                     "style": {"backgroundColor": "transparent", "zIndex": "10000"}
                 }
-            ), height=650) # Expanded 650px vertical screen space footprint height allocation
+            ), height=650)
         else:
             st.info("Loading baseline tracking matrix...")
 
@@ -533,7 +541,6 @@ with tab2:
         st.markdown("---")
         st.success(f"**Target Anchored:**\n\n{label_name}\n\nLocation: {target_lat}°, {target_lon}°")
         
-        # Calculate dynamic tectonic proximity context for Sandbox epicenter selection
         sandbox_fault, sandbox_reason = find_nearest_fault_info(target_lat, target_lon)
         
         should_calculate_waves = sim_mag >= 6.5
@@ -582,7 +589,6 @@ with tab2:
         
         marker_color = [0, 242, 254, 255] if mode == "🌐 NOAA Framework: Pre-Computed Coastal Gauges" else [255, 0, 255, 200]
         
-        # --- FIXED: NATIVE GEOPANDAS VECTOR BUFFER LAYER ---
         point_gdf = gpd.GeoDataFrame(
             geometry=gpd.points_from_xy([target_lon], [target_lat]),
             crs="EPSG:4326"
@@ -591,7 +597,6 @@ with tab2:
         buffer_distance = 150000 if mode == "🌐 NOAA Framework: Pre-Computed Coastal Gauges" else 250000
         buffer_gdf = point_gdf.to_crs(epsg=3857).buffer(buffer_distance).to_crs(epsg=4326)
         
-        # Build DataFrame for Epicenter interactive info passing inside Sandbox
         df_sandbox_point = pd.DataFrame([{
             "Lat": target_lat,
             "Lon": target_lon,
@@ -600,17 +605,15 @@ with tab2:
             "Reason": sandbox_reason
         }])
         
-        # Render the accurate kilometer radius circle buffer
         layer_rep_epi_buffer = pdk.Layer(
             "GeoJsonLayer",
             buffer_gdf.__geo_interface__,
-            get_fill_color=marker_color + [60],  # Semi-transparent buffer ring
+            get_fill_color=marker_color + [60],  
             filled=True,
             stroked=False,
             pickable=False
         )
         
-        # Layer B2: Core Interactive Epicenter Node
         layer_rep_epi_core = pdk.Layer(
             "ScatterplotLayer",
             df_sandbox_point,
@@ -620,7 +623,6 @@ with tab2:
             pickable=True
         )
         
-        # Layer B3: Fault Lines Vectorization Network (Sandbox view)
         layer_sandbox_faults = pdk.Layer(
             "PathLayer",
             df_faults,
@@ -633,7 +635,6 @@ with tab2:
         
         layers_sandbox = [layer_rep_epi_buffer, layer_rep_epi_core]
         
-        # Append sandbox fault visualization vectors if checkbox toggled active
         if show_faults:
             layers_sandbox.insert(0, layer_sandbox_faults)
         
@@ -668,3 +669,10 @@ with tab2:
                 "style": {"backgroundColor": "transparent", "zIndex": "10000"}
             }
         ), height=650)
+
+# ==============================================================================
+# 6. HIGH-FREQUENCY RADAR PULSE LOOP CONTROL
+# ==============================================================================
+# Forces Streamlit to instantly re-render every 150ms to drive the heartbeat fluidly
+time.sleep(0.15)
+st.rerun()
