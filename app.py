@@ -10,17 +10,16 @@ import geopandas as gpd
 from rasterio import features
 from rasterio.transform import from_bounds
 
+# 1. Global Platform System Configuration
+st.set_page_config(layout="wide", page_title="Unified Tsunami EWS & Routing Hub", page_icon="🌊")
+
 # Find your sidebar header/title, and paste right beneath it:
 st.sidebar.title("📟 Live Operations Center")
 
-# PASTE THIS EXACT BLOCK HERE:
 st.sidebar.markdown("""
 ---
 ⚠️ **National Border Disclaimer:** *This application uses international map tiles provided by third-party open-source libraries (CARTO/OpenStreetMap). The borders shown do not imply the expression of any opinion whatsoever concerning the legal status of any country or territory. The developer recognizes the entire territory of Jammu, Kashmir, and Ladakh as an integral part of India in accordance with the official maps published by the Survey of India.*
 """)
-
-# 1. Global Platform System Configuration
-st.set_page_config(layout="wide", page_title="Unified Tsunami EWS & Routing Hub", page_icon="🌊")
 
 st.markdown("""
     <style>
@@ -32,6 +31,47 @@ st.markdown("""
 
 st.title("🎛️ Unified Tsunami Early Warning & Routing Platform")
 st.markdown("---")
+
+# ==============================================================================
+# DATA CORE: Define the 3 prominent regional plate boundary/fault zone paths
+# ==============================================================================
+faults_data = [
+    {
+        "name": "Sunda Megathrust / Sumatra Subduction Zone",
+        "reason": "The Indo-Australian Plate is actively subducting beneath the Burma/Sunda microplates at ~60mm/yr, generating massive megathrust slip failures.",
+        "path": [[95.0, 6.0], [94.0, 2.0], [93.0, -2.0], [97.0, -6.0]],
+        "color": [255, 69, 0, 180]  # Orange-Red
+    },
+    {
+        "name": "Andaman Rift Valley / Transform Fault Complex",
+        "reason": "Oblique tectonic shearing and sea-floor spreading along the Andaman sea basin edge creating transform strike-slip faults.",
+        "path": [[92.0, 14.0], [93.5, 11.0], [95.0, 6.0]],
+        "color": [255, 215, 0, 180]  # Gold
+    },
+    {
+        "name": "Owen Fracture Zone / Arabian Sea Boundary",
+        "reason": "A major dextral strike-slip transform fault separating the Arabian Plate from the Indo-Australian Plate.",
+        "path": [[60.0, 20.0], [62.0, 15.0], [65.0, 10.0]],
+        "color": [50, 205, 50, 180]  # Lime Green
+    }
+]
+df_faults = pd.DataFrame(faults_data)
+
+def find_nearest_fault_info(lat, lon):
+    """Calculates the closest fault boundary to any coordinate point."""
+    nearest_fault_name = "Unknown Plate Boundary"
+    nearest_fault_reason = "Dynamic trigger outside primary regional network tracking layers."
+    min_distance = float('inf')
+    
+    for fault in faults_data:
+        for node in fault["path"]:
+            dist = np.sqrt((node[1] - lat)**2 + (node[0] - lon)**2)
+            if dist < min_distance:
+                min_distance = dist
+                nearest_fault_name = fault["name"]
+                nearest_fault_reason = fault["reason"]
+                
+    return nearest_fault_name, nearest_fault_reason
 
 # 2. Optimized High-Performance Wave Propagation Engine
 @st.cache_data(ttl=3600)  # Cache the baseline land mask to keep performance lightning fast
@@ -53,9 +93,7 @@ def get_cached_land_mask(height, width):
         return None
 
 def calculate_propagation(epicenter_lat, epicenter_lon):
-    """
-    Computes tsunami travel times using highly-optimized vectorized raster masks.
-    """
+    """Computes tsunami travel times using highly-optimized vectorized raster masks."""
     height, width = 180, 360
     lats = np.linspace(-90, 90, height)
     lons = np.linspace(-180, 180, width)
@@ -118,13 +156,9 @@ def get_contour_paths(lons, lats, travel_grid, max_hours=12):
 # ==============================================================================
 # 3. DYNAMIC MULTI-TIERED DATA INGESTION ENGINE & IST PROCESSING MATRIX
 # ==============================================================================
-
 @st.cache_data(ttl=30)
 def fetch_dynamic_seismic_matrix():
-    """
-    Connects to the global USGS streaming seismic network, handles dynamic
-    IST timestamp shifting, and filters multi-tiered temporal arrays.
-    """
+    """Connects to the global USGS streaming seismic network, handles dynamic IST timestamp shifting, and filters multi-tiered temporal arrays."""
     now = datetime.utcnow()
     url = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_week.geojson"
     
@@ -153,6 +187,9 @@ def fetch_dynamic_seismic_matrix():
         hours_old = (now - event_dt_utc).total_seconds() / 3600
         readable_time = event_dt_ist.strftime('%m-%d %H:%M') + " IST"
         
+        # Inject tectonic reasons dynamically for the event based on closest fault node
+        fault_name, fault_reason = find_nearest_fault_info(lat, lon)
+        
         event_dict = {
             "Title": prop.get('title'),
             "Place": prop.get('place') if prop.get('place') else "Open Ocean",
@@ -163,7 +200,9 @@ def fetch_dynamic_seismic_matrix():
             "Time": readable_time,
             "Time_Raw": event_dt_ist, 
             "Hours_Old": hours_old,
-            "Is_Tsunami_Threat": False
+            "Is_Tsunami_Threat": False,
+            "Fault": fault_name,
+            "Reason": fault_reason
         }
         
         is_seafloor_rupture = mag and mag >= 6.5 and depth < 100
@@ -185,10 +224,10 @@ df_all, df_tsunami, df_regional_past = fetch_dynamic_seismic_matrix()
 
 if df_all.empty:
     df_all = pd.DataFrame([
-        {"Title": "M 4.5 - Andaman Islands, India Region", "Place": "Andaman Islands, India", "Magnitude": 4.5, "Depth": 35.0, "Latitude": 11.6, "Longitude": 92.7, "Time": "06-10 12:45 IST", "Time_Raw": datetime.utcnow(), "Is_Tsunami_Threat": False},
-        {"Title": "M 5.2 - Hindu Kush Region, Afghanistan", "Place": "Hindu Kush, Afghanistan", "Magnitude": 5.2, "Depth": 120.0, "Latitude": 36.5, "Longitude": 70.8, "Time": "06-10 11:20 IST", "Time_Raw": datetime.utcnow(), "Is_Tsunami_Threat": False},
-        {"Title": "M 3.1 - Nicobar Islands, India", "Place": "Nicobar Islands, India", "Magnitude": 3.1, "Depth": 10.0, "Latitude": 7.1, "Longitude": 93.8, "Time": "06-10 09:15 IST", "Time_Raw": datetime.utcnow(), "Is_Tsunami_Threat": False},
-        {"Title": "M 7.1 - Banda Sea, Indonesia (CRITICAL THREAT)", "Place": "Banda Sea, Indonesia", "Magnitude": 7.1, "Depth": 15.0, "Latitude": -6.5, "Longitude": 129.2, "Time": "06-10 06:10 IST", "Time_Raw": datetime.utcnow(), "Is_Tsunami_Threat": True}
+        {"Title": "M 4.5 - Andaman Islands, India Region", "Place": "Andaman Islands, India", "Magnitude": 4.5, "Depth": 35.0, "Latitude": 11.6, "Longitude": 92.7, "Time": "06-10 12:45 IST", "Time_Raw": datetime.utcnow(), "Is_Tsunami_Threat": False, "Fault": faults_data[1]["name"], "Reason": faults_data[1]["reason"]},
+        {"Title": "M 5.2 - Hindu Kush Region, Afghanistan", "Place": "Hindu Kush, Afghanistan", "Magnitude": 5.2, "Depth": 120.0, "Latitude": 36.5, "Longitude": 70.8, "Time": "06-10 11:20 IST", "Time_Raw": datetime.utcnow(), "Is_Tsunami_Threat": False, "Fault": "Eurasian Plate Internal Fracture", "Reason": "Deep continental lithospheric compression."},
+        {"Title": "M 3.1 - Nicobar Islands, India", "Place": "Nicobar Islands, India", "Magnitude": 3.1, "Depth": 10.0, "Latitude": 7.1, "Longitude": 93.8, "Time": "06-10 09:15 IST", "Time_Raw": datetime.utcnow(), "Is_Tsunami_Threat": False, "Fault": faults_data[0]["name"], "Reason": faults_data[0]["reason"]},
+        {"Title": "M 7.1 - Banda Sea, Indonesia (CRITICAL THREAT)", "Place": "Banda Sea, Indonesia", "Magnitude": 7.1, "Depth": 15.0, "Latitude": -6.5, "Longitude": 129.2, "Time": "06-10 06:10 IST", "Time_Raw": datetime.utcnow(), "Is_Tsunami_Threat": True, "Fault": faults_data[0]["name"], "Reason": faults_data[0]["reason"]}
     ])
     df_tsunami = df_all[df_all["Is_Tsunami_Threat"] == True]
     df_regional_past = pd.DataFrame()
@@ -212,7 +251,7 @@ tab1, tab2 = st.tabs(["🖥️ LIVE OPERATIONS ROOM", "🗺️ HYDRODYNAMIC ROUT
 # TAB 1: LIVE OPERATIONS ROOM
 # ==============================================
 with tab1:
-    col1_map, col1_ticker = st.columns([2, 1])
+    col1_map, col1_ticker = st.columns([1, 2])
     if "selected_event_index" not in st.session_state:
         st.session_state.selected_event_index = None
 
@@ -260,8 +299,8 @@ with tab1:
                 "ScatterplotLayer",
                 df_mapped,
                 get_position="[Longitude, Latitude]",
-                get_radius="is_active_selection ? 18 : (Is_Tsunami_Threat ? 12 : 6)", 
-                radius_min_pixels=4,   
+                get_radius="is_active_selection ? 180000 : (Is_Tsunami_Threat ? 120000 : 60000)", 
+                radius_min_pixels=6,   
                 radius_max_pixels=35,  
                 get_fill_color="is_active_selection ? [0, 242, 254, 255] : (Is_Tsunami_Threat ? [255, 30, 30, 240] : [255, 160, 20, 160])",
                 get_line_color="is_active_selection ? [255, 255, 255, 255] : [0, 0, 0, 0]",
@@ -272,7 +311,19 @@ with tab1:
                 highlight_color=[0, 242, 254, 255]
             )
             
-            layers_to_render = [layer_all_quakes]
+            # Layer A1: Fault Lines Vectorization Network
+            layer_fault_lines = pdk.Layer(
+                "PathLayer",
+                df_faults,
+                get_path="path",
+                get_color="color",
+                width_scale=5,
+                width_min_pixels=3,
+                pickable=False
+            )
+            
+            layers_to_render = [layer_fault_lines, layer_all_quakes]
+            
             if not df_tsunami.empty:
                 st.warning("⚠️ CRITICAL UNDERWATER EVENT RECOGNIZED. RAMPING UP WAVE PROPAGATION MODEL.")
                 active_epi = df_tsunami.iloc[0]
@@ -298,12 +349,14 @@ with tab1:
                 map_style="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
                 tooltip={
                     "html": """
-                        <div style='font-family: monospace; background-color: #121824; color: #00f2fe; padding: 8px; border-radius: 4px; border: 1px solid #00f2fe;'>
+                        <div style='font-family: monospace; background-color: #121824; color: #00f2fe; padding: 8px; border-radius: 4px; border: 1px solid #00f2fe; max-width: 300px;'>
                             <b>📊 Magnitude:</b> {Magnitude}<br/>
                             <b>📍 Location:</b> {Place}<br/>
                             <b>🌐 Coordinates:</b> {Latitude}°, {Longitude}°<br/>
                             <b>📉 Depth:</b> {Depth} km<br/>
-                            <b>🕒 Date/Time:</b> {Time}
+                            <b>🛡️ Proximity Fault:</b> {Fault}<br/>
+                            <b>💥 Trigger Reason:</b> {Reason}<br/>
+                            <b>🕒 Time:</b> {Time}
                         </div>
                     """,
                     "style": {"backgroundColor": "transparent", "zIndex": "10000"}
@@ -418,6 +471,9 @@ with tab2:
         st.markdown("---")
         st.success(f"**Target Anchored:**\n\n{label_name}\n\nLocation: {target_lat}°, {target_lon}°")
         
+        # Calculate dynamic tectonic proximity context for Sandbox epicenter selection
+        sandbox_fault, sandbox_reason = find_nearest_fault_info(target_lat, target_lon)
+        
         should_calculate_waves = sim_mag >= 6.5
         if should_calculate_waves:
             lons_r, lats_r, travel_grid_r = calculate_propagation(target_lat, target_lon)
@@ -465,29 +521,55 @@ with tab2:
         marker_color = [0, 242, 254, 255] if mode == "🌐 NOAA Framework: Pre-Computed Coastal Gauges" else [255, 0, 255, 200]
         
         # --- FIXED: NATIVE GEOPANDAS VECTOR BUFFER LAYER ---
-        # 1. Create a clean GeoDataFrame for the epicenter point
         point_gdf = gpd.GeoDataFrame(
             geometry=gpd.points_from_xy([target_lon], [target_lat]),
             crs="EPSG:4326"
         )
         
-        # 2. Convert to a metric coordinate system to draw an accurate kilometer radius circle buffer
-        # (Using a true 150km buffer for NOAA gauges, 250km for manual simulations)
         buffer_distance = 150000 if mode == "🌐 NOAA Framework: Pre-Computed Coastal Gauges" else 250000
-        
-        # Project to world Mercator meter system (3857), build the circle, and bring it back to global coordinates (4326)
         buffer_gdf = point_gdf.to_crs(epsg=3857).buffer(buffer_distance).to_crs(epsg=4326)
         
-        # 3. Render the actual geometry shape directly as a map layer
-        layer_rep_epi = pdk.Layer(
+        # Build DataFrame for Epicenter interactive info passing inside Sandbox
+        df_sandbox_point = pd.DataFrame([{
+            "Lat": target_lat,
+            "Lon": target_lon,
+            "Mag": sim_mag,
+            "Fault": sandbox_fault,
+            "Reason": sandbox_reason
+        }])
+        
+        # Render the accurate kilometer radius circle buffer
+        layer_rep_epi_buffer = pdk.Layer(
             "GeoJsonLayer",
-            buffer_gdf.__geo_interface__,  # Feeds the shape directly to deck.gl
-            get_fill_color=marker_color,
+            buffer_gdf.__geo_interface__,
+            get_fill_color=marker_color + [60],  # Semi-transparent buffer ring
             filled=True,
             stroked=False,
+            pickable=False
+        )
+        
+        # Layer B2: Core Interactive Epicenter Node
+        layer_rep_epi_core = pdk.Layer(
+            "ScatterplotLayer",
+            df_sandbox_point,
+            get_position="[Lon, Lat]",
+            get_radius=80000,
+            get_fill_color=marker_color,
             pickable=True
         )
-        layers_sandbox = [layer_rep_epi]
+        
+        # Layer B3: Fault Lines Vectorization Network (Sandbox view)
+        layer_sandbox_faults = pdk.Layer(
+            "PathLayer",
+            df_faults,
+            get_path="path",
+            get_color="color",
+            width_scale=5,
+            width_min_pixels=3,
+            pickable=False
+        )
+        
+        layers_sandbox = [layer_sandbox_faults, layer_rep_epi_buffer, layer_rep_epi_core]
         
         if should_calculate_waves and 'df_replay_contours' in locals() and not df_replay_contours.empty:
             layer_rep_contours = pdk.Layer(
@@ -507,5 +589,16 @@ with tab2:
             layers=layers_sandbox,
             initial_view_state=view_rep,
             map_style="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
-            tooltip={"text": "Simulation Front Node\nTime From Source: {hour} Hours"}
+            tooltip={
+                "html": """
+                    <div style='font-family: monospace; background-color: #121824; color: #00f2fe; padding: 8px; border-radius: 4px; border: 1px solid #00f2fe; max-width: 300px;'>
+                        <b>🔮 Simulation Node Trigger</b><br/>
+                        <b>Coordinates:</b> {Lat}°, {Lon}°<br/>
+                        <b>Assigned Magnitude:</b> M{Mag}<br/>
+                        <b>Nearest Boundary:</b> {Fault}<br/>
+                        <b>Tectonic Mechanism:</b> {Reason}
+                    </div>
+                """,
+                "style": {"backgroundColor": "transparent", "zIndex": "10000"}
+            }
         ))
