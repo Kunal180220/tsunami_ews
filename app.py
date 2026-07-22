@@ -69,18 +69,25 @@ faults_data = [
 df_faults = pd.DataFrame(faults_data)
 
 def find_nearest_fault_info(lat, lon):
-    """Calculates the closest fault boundary to any coordinate point."""
-    nearest_fault_name = "Unknown Plate Boundary"
-    nearest_fault_reason = "Dynamic trigger outside primary regional network tracking layers."
+    """Calculates the closest fault boundary to any coordinate point with a distance cap."""
+    nearest_fault_name = "Intraplate / Local Fault Zone"
+    nearest_fault_reason = "Regional crustal stress release outside primary major subduction/transform tracking layers."
     min_distance = float('inf')
+    
+    # Maximum allowed distance (in degrees, ~15° ≈ 1500km) to associate a fault
+    DISTANCE_THRESHOLD = 15.0 
     
     for fault in faults_data:
         for node in fault["path"]:
             dist = np.sqrt((node[1] - lat)**2 + (node[0] - lon)**2)
             if dist < min_distance:
                 min_distance = dist
-                nearest_fault_name = fault["name"]
-                nearest_fault_reason = fault["reason"]
+                closest_fault = fault
+
+    # Only assign the specific fault name/reason if the event is actually near it
+    if min_distance <= DISTANCE_THRESHOLD:
+        nearest_fault_name = closest_fault["name"]
+        nearest_fault_reason = closest_fault["reason"]
                 
     return nearest_fault_name, nearest_fault_reason
 
